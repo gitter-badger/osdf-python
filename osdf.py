@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 import base64
-import httplib
+#import httplib
 import json
 import os
 import sys
-from request import HttpRequest
+#from request import HttpRequest
+import requests
 
 class OSDF(object):
     """
@@ -14,11 +15,27 @@ class OSDF(object):
     """
 
     def __init__(self, server, username, password, port=8123):
-        self._server = server
-        self._port = port
-        self._username = username
-        self._password = password
-        self._request = HttpRequest(server, username, password, port=port)
+        self.server(server)
+        self.port(port)
+        self.username(username)
+        self.password(password)
+
+        self.session(requests.Session())
+        #self._session = requests.Session()
+        self.session.auth = (self.username, self.password)
+        self.session.headers = {'server': self.server, 'port': self.port}
+
+        # wtf is 2 ??
+        #self._request = 2
+
+    @property
+    def session(self):
+        return self._session
+
+    @session.setter
+    def session(self, session):
+        self._session = session
+        #TODO: Redefine the session and request objects
 
     @property
     def server(self):
@@ -27,9 +44,9 @@ class OSDF(object):
     @server.setter
     def server(self, server):
         self._server = server
-        # Redefine the request object
-        self._request = HttpRequest(self._server, self._username,
-                                    self._password, self._port)
+        # TODO: Redefine the request object or the headers dict
+        #self._request = HttpRequest(self._server, self._username,
+                                    #self._password, self._port)
 
     @property
     def port(self):
@@ -39,8 +56,8 @@ class OSDF(object):
     def port(self, port):
         self._port = port
         # Redefine the request object
-        self._request = HttpRequest(self._server, self._username,
-                                    self._password, self._port)
+        #self._request = HttpRequest(self._server, self._username,
+                                    #self._password, self._port)
 
     @property
     def username(self):
@@ -50,8 +67,8 @@ class OSDF(object):
     def username(self, username):
         self._username = username
         # Redefine the request object
-        self._request = HttpRequest(self._server, self._username,
-                                    self._password, self._port)
+        #self._request = HttpRequest(self._server, self._username,
+                                    #self._password, self._port)
 
     @property
     def password(self):
@@ -61,8 +78,8 @@ class OSDF(object):
     def password(self, password):
         self._password = password
         # Redefine the request object
-        self._request = HttpRequest(self._server, self._username,
-                                    self._password, self._port)
+        #self._request = HttpRequest(self._server, self._username,
+                                    #self._password, self._port)
 
     def edit_node(self, json_data):
         """
@@ -76,7 +93,7 @@ class OSDF(object):
 
         json_str = json.dumps(json_data);
 
-        osdf_response = self._request.put("/nodes/" + node_id, json_str)
+        osdf_response = self._session.put("/nodes/" + node_id, json_str)
 
         if osdf_response["code"] != 200:
             headers = osdf_response['headers']
@@ -89,9 +106,11 @@ class OSDF(object):
                 raise Exception("Unable to edit node document.")
 
     def _byteify(self, input):
-        if isinstance(input, dict):
-            return {self._byteify(key):self._byteify(value) for key,value in input.iteritems()}
-        elif isinstance(input, list):
+        #TODO: repair or refactor `_byteify` for loop
+        #if isinstance(input, dict):
+            #return {self._byteify(key):self._byteify(value) for key,value in input.iteritems()}
+        #el
+        if isinstance(input, list):
             return [self._byteify(element) for element in input]
         elif isinstance(input, unicode):
             return input.encode('utf-8')
@@ -102,11 +121,10 @@ class OSDF(object):
         """
         Retrieve's the OSDF server's information/contact document
         """
-        osdf_response = self._request.get("/info")
+        osdf_response = self._session.get("/info")
 
-        info = json.loads( osdf_response['content'] )
-
-        info = self._byteify(info)
+        info = json.loads( osdf_response['content'], encoding='utf-8' )
+        #info = self._byteify(info)
 
         return info
 
@@ -116,7 +134,7 @@ class OSDF(object):
 
         Returns the parsed form of the JSON document for the node
         """
-        osdf_response = self._request.get("/nodes/" + node_id)
+        osdf_response = self._session.get("/nodes/" + node_id)
 
         if osdf_response["code"] != 200:
             headers = osdf_response['headers']
@@ -143,7 +161,7 @@ class OSDF(object):
         """
         url = '/namespaces/%s/schemas/%s' % (namespace, schema_name)
 
-        osdf_response = self._request.get(url)
+        osdf_response = self._session.get(url)
 
         if osdf_response["code"] != 200:
             headers = osdf_response['headers']
@@ -170,7 +188,7 @@ class OSDF(object):
         """
         url = '/namespaces/%s/schemas/aux/%s' % (namespace, aux_schema_name)
 
-        osdf_response = self._request.get(url)
+        osdf_response = self._session.get(url)
 
         if osdf_response["code"] != 200:
             headers = osdf_response['headers']
@@ -197,7 +215,7 @@ class OSDF(object):
         """
         json_str = json.dumps(json_data);
 
-        osdf_response = self._request.post("/nodes", json_str)
+        osdf_response = self._session.post("/nodes", json_str)
         node_id = None
 
         headers = osdf_response["headers"]
@@ -221,7 +239,7 @@ class OSDF(object):
         """
         Deletes the specified node from OSDF.
         """
-        osdf_response = self._request.delete("/nodes/" + node_id)
+        osdf_response = self._session.delete("/nodes/" + node_id)
 
         headers = osdf_response["headers"]
 
@@ -245,7 +263,7 @@ class OSDF(object):
         json_str = json.dumps(json_data);
         url = "/nodes/validate"
 
-        osdf_response = self._request.post(url, json_str)
+        osdf_response = self._session.post(url, json_str)
         headers = osdf_response["headers"]
         valid = False
 
@@ -271,7 +289,7 @@ class OSDF(object):
         """
         url = "/nodes/query/%s/page/%s" % (namespace, str(page))
 
-        osdf_response = self._request.post(url, query)
+        osdf_response = self._session.post(url, query)
 
         if osdf_response["code"] != 200 and osdf_response["code"] != 206:
             headers = osdf_response["headers"]
